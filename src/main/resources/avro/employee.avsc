@@ -1,0 +1,11 @@
+{
+  "namespace": "com.example.avro.generated",
+  "type": "record",
+  "name": "Employee",
+  "doc": "Pracownik firmy",
+  "fields": [
+    { "name": "firstName", "type": "string" },
+    { "name": "age", "type": "int" },
+    { "name": "email", "type": ["null", "string"], "default": null }
+  ]
+}

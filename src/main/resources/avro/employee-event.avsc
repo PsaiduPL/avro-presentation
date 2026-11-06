@@ -1,0 +1,11 @@
+{
+  "namespace": "com.example.avro.generated",
+  "type": "record",
+  "name": "EmployeeEvent",
+  "doc": "Wiadomość benchmarku: pracownik + znacznik czasu wysłania",
+  "fields": [
+    { "name": "id", "type": "long" },
+    { "name": "employee", "type": "com.example.avro.generated.Employee" },
+    { "name": "sentAt", "type": { "type": "long", "logicalType": "timestamp-micros" }}
+  ]
+}

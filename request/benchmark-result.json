@@ -1,0 +1,26 @@
+[
+  {
+    "format": "avro",
+    "messages": 10000,
+    "bytesPerMessage": 21.1744,
+    "totalBytes": 211744,
+    "totalTimeMs": 77.92,
+    "messagesPerSecond": 128333,
+    "avgLatencyMs": 17.84,
+    "p50LatencyMs": 18.56,
+    "p95LatencyMs": 23.3,
+    "maxLatencyMs": 23.83
+  },
+  {
+    "format": "json",
+    "messages": 10000,
+    "bytesPerMessage": 88.889,
+    "totalBytes": 888890,
+    "totalTimeMs": 95.59,
+    "messagesPerSecond": 104617,
+    "avgLatencyMs": 32.97,
+    "p50LatencyMs": 35.61,
+    "p95LatencyMs": 38.89,
+    "maxLatencyMs": 40.02
+  }
+]

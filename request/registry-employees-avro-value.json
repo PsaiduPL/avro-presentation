@@ -1,0 +1,10 @@
+{
+  "subject": "employees-avro-value",
+  "version": 2,
+  "id": 2,
+  "guid": "5325c14e-2d35-3b56-7ed5-c69fcd3d184e",
+  "schemaType": "AVRO",
+  "schema": "{\"type\":\"record\",\"name\":\"Employee\",\"namespace\":\"com.example.avro.generated\",\"doc\":\"Pracownik firmy\",\"fields\":[{\"name\":\"firstName\",\"type\":\"string\"},{\"name\":\"age\",\"type\":\"long\"},{\"name\":\"email\",\"type\":[\"null\",\"string\"],\"default\":null}]}",
+  "ts": 1793641868436,
+  "deleted": false
+}

@@ -1,0 +1,23 @@
+// benchmark
+POST http://localhost:8080/benchmark?count=10000
+
+>>! benchmark-result.json
+###
+
+// registry: all subjects
+GET http://localhost:8081/subjects
+
+>>! registry-subjects.json
+###
+
+// registry: employees-avro-value schema
+GET http://localhost:8081/subjects/employees-avro-value/versions/latest
+
+>>! registry-employees-avro-value.json
+###
+
+// registry: compatibility mode
+GET http://localhost:8081/config
+
+>>! registry-config.json
+###

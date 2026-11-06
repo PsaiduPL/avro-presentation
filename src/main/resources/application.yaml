@@ -1,0 +1,23 @@
+spring:
+  application:
+    name: avro
+  kafka:
+    bootstrap-servers: localhost:9092
+    producer:
+      value-serializer: io.confluent.kafka.serializers.KafkaAvroSerializer
+    consumer:
+      group-id: demo
+      auto-offset-reset: earliest
+      value-deserializer: io.confluent.kafka.serializers.KafkaAvroDeserializer
+    properties:
+      schema.registry.url: http://localhost:8081
+      specific.avro.reader: true
+
+
+logging:
+  level:
+    org.apache.kafka: WARN
+    io.confluent: WARN
+
+benchmark:
+  message-count: 100
