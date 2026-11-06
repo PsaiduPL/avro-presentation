@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Apache Avro: od bajtów do Kafki</title>
+<!-- Fonty z Google Fonts; offline działa zastępczy font systemowy -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Abril+Fatface&family=Nunito+Sans:wght@400;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- Symbole dekoracyjne: liście w stylu ilustracji z makiety -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="leaf" viewBox="-60 -120 120 240">
+      <path d="M0-115C46-70 54 40 0 115C-54 40-46-70 0-115Z"/>
+      <path d="M0-98V108M0-40L22-62M0 0L-24-24M0 40L24 18" stroke="rgba(42,21,32,.16)" stroke-width="4" fill="none"/>
+    </symbol>
+    <symbol id="oak" viewBox="-100 -100 200 200">
+      <path d="M0-95C30-95 35-60 55-62C85-65 92-30 75-15C100-5 98 30 70 38C80 65 55 88 30 70C20 96-20 96-30 70C-55 88-80 65-70 38C-98 30-100-5-75-15C-92-30-85-65-55-62C-35-60-30-95 0-95Z"/>
+      <path d="M0-80V85M0-20L45-45M0-20L-45-45M0 25L48 15M0 25L-48 15" stroke="rgba(42,21,32,.16)" stroke-width="5" fill="none"/>
+    </symbol>
+    <symbol id="sprig" viewBox="0 0 200 420">
+      <g fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M100 420C98 320 104 200 130 10"/>
+        <path d="M101 340C70 330 45 300 38 262C72 270 96 300 101 340Z"/>
+        <path d="M102 290C130 270 150 240 158 200C125 210 105 245 102 290Z"/>
+        <path d="M106 220C78 205 60 175 58 140C88 152 104 180 106 220Z"/>
+        <path d="M112 160C138 140 152 110 156 75C126 88 114 120 112 160Z"/>
+        <path d="M120 95C100 80 92 55 94 30C116 42 124 66 120 95Z"/>
+      </g>
+    </symbol>
+  </defs>
+</svg>
+
+<div class="stage">
+
+  <!-- ===== Stałe elementy ===== -->
+  <nav class="topnav">
+    <div class="group">
+      <a data-go="1" data-section="wstep">Wstęp</a>
+      <a data-go="3" data-section="avro">Czym jest Avro</a>
+      <a data-go="9" data-section="schemat">Schema</a>
+      <a data-go="14" data-section="ewolucja">Schema evolution</a>
+    </div>
+    <div class="logo" title="Początek"><span class="l1">A</span><span class="l2">V</span></div>
+    <div class="group">
+      <a data-go="18" data-section="kafka">Kafka</a>
+      <a data-go="22" data-section="parquet">Parquet</a>
+      <a data-go="23" data-section="koniec">Podsumowanie</a>
+    </div>
+  </nav>
+  <div class="hints"><span><kbd>←</kbd><kbd>→</kbd>nawigacja</span><span><kbd>F</kbd>pełny ekran</span></div>
+  <div class="counter"></div>
+  <div class="progress"></div>
+
+  <!-- ================================================================
+       WSTĘP
+       ================================================================ -->
+
+  <!-- 1. Tytuł -->
+  <section class="slide s-title" data-section="wstep">
+    <div class="title-left">
+      <h1>Apache<br>Avro</h1>
+      <p class="lead">Format serializacji, który napędza data streaming.</p>
+      <div class="authors">Eryk Kurdziel</div>
+    </div>
+
+    <svg class="hero" viewBox="0 0 760 800" aria-hidden="true">
+      <use href="#sprig" x="560" y="10" width="200" height="420" style="color:var(--olive)"/>
+      <use href="#sprig" x="30" y="90" width="150" height="320" transform="rotate(-22 105 250)" style="color:var(--olive)"/>
+      <use href="#leaf" x="520" y="230" width="200" height="400" transform="rotate(30 620 430)" style="fill:var(--pink)"/>
+      <use href="#leaf" x="70" y="360" width="170" height="340" transform="rotate(-42 155 530)" style="fill:var(--pink)"/>
+      <circle cx="390" cy="410" r="250" fill="var(--mustard)"/>
+      <use href="#oak" x="470" y="470" width="290" height="290" style="fill:var(--red)"/>
+      <use href="#oak" x="40" y="520" width="250" height="250" style="fill:var(--red)"/>
+      <use href="#leaf" x="610" y="410" width="80" height="170" transform="rotate(55 650 495)" style="fill:var(--navy)"/>
+      <use href="#leaf" x="250" y="580" width="140" height="250" transform="rotate(-18 320 705)" style="fill:var(--olive)"/>
+      <use href="#oak" x="320" y="600" width="190" height="190" style="fill:var(--wine)"/>
+
+      <!-- karta z bajtami rekordu Employee -->
+      <g transform="translate(190 225) rotate(-6)">
+        <rect width="370" height="240" rx="22" fill="var(--paper)" stroke="var(--ink)" stroke-width="5"/>
+        <text x="32" y="52" class="svg-label">employee.avro</text>
+        <g class="svg-chip" text-anchor="middle">
+          <rect x="30"  y="78" width="68" height="52" rx="9" fill="var(--mustard)" stroke="var(--ink)" stroke-width="3"/><text x="64"  y="113">06</text>
+          <rect x="108" y="78" width="68" height="52" rx="9" fill="var(--mustard)" stroke="var(--ink)" stroke-width="3"/><text x="142" y="113">41</text>
+          <rect x="186" y="78" width="68" height="52" rx="9" fill="var(--mustard)" stroke="var(--ink)" stroke-width="3"/><text x="220" y="113">6C</text>
+          <rect x="264" y="78" width="68" height="52" rx="9" fill="var(--mustard)" stroke="var(--ink)" stroke-width="3"/><text x="298" y="113">61</text>
+          <rect x="30"  y="146" width="68" height="52" rx="9" fill="var(--coral)" stroke="var(--ink)" stroke-width="3"/><text x="64"  y="181">04</text>
+          <rect x="108" y="146" width="68" height="52" rx="9" fill="var(--navy)" stroke="var(--ink)" stroke-width="3"/><text x="142" y="181" fill="var(--cream)">00</text>
+        </g>
+      </g>
+
+      <!-- lupa: "odczytujemy" bajty -->
+      <g transform="translate(540 455) rotate(-38)">
+        <rect x="-22" y="112" width="44" height="200" rx="20" fill="var(--ink)"/>
+        <rect x="-30" y="100" width="60" height="34" rx="10" fill="var(--navy)"/>
+        <circle r="112" fill="rgba(255,251,239,.92)" stroke="var(--navy)" stroke-width="24"/>
+        <g transform="rotate(38)">
+          <text text-anchor="middle" y="6" style="font-family:var(--display);font-size:64px" fill="var(--ink)">Ala</text>
+          <text text-anchor="middle" y="52" style="font-family:var(--sans);font-weight:800;font-size:24px;letter-spacing:.06em" fill="var(--coral)">AGE 2</text>
+        </g>
+      </g>
+    </svg>
+  </section>
+
+  <!-- 2. Agenda -->
+  <section class="slide" data-section="wstep">
+    <div class="eyebrow">Agenda</div>
+    <h2>Plan prezentacji</h2>
+    <div class="cols3" style="margin-top:20px">
+      <div class="card pad-top">
+        <div class="bar" style="background:var(--mustard)"></div>
+        <div class="big-num">I</div>
+        <h3>Czym jest Avro?</h3>
+        <ul class="clean">
+          <li>format binarny</li>
+          <li>układ wierszowy</li>
+          <li>jak wyglądają bajty</li>
+          <li>zigzag encoding</li>
+          <li>niezależność od języka</li>
+        </ul>
+      </div>
+      <div class="card pad-top">
+        <div class="bar" style="background:var(--coral)"></div>
+        <div class="big-num">II</div>
+        <h3>Schema</h3>
+        <ul class="clean">
+          <li>typy proste i złożone</li>
+          <li>logical types</li>
+          <li>schema evolution</li>
+          <li>type promotion</li>
+          <li>zmiana nazw pól</li>
+        </ul>
+      </div>
+      <div class="card pad-top">
+        <div class="bar" style="background:var(--olive)"></div>
+        <div class="big-num">III</div>
+        <h3>Avro w praktyce</h3>
+        <ul class="clean">
+          <li>Kafka + Schema Registry</li>
+          <li>generowanie klas</li>
+          <li>producent i konsument</li>
+          <li>Avro i Parquet</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================================================================
+       CZĘŚĆ I: CZYM JEST AVRO?
+       ================================================================ -->
+
+  <!-- 3. Czym jest Avro -->
+  <section class="slide" data-section="avro">
+    <div class="eyebrow">Część I · Czym jest Avro?</div>
+    <h2>Czym jest Avro?</h2>
+    <p class="lead">System serializacji danych rekordowych. Projekt Apache, stworzony w&nbsp;2009&nbsp;r. przez Douga Cuttinga. <span class="muted">Serializacja to zamiana obiektu z&nbsp;pamięci na bajty i&nbsp;z&nbsp;powrotem.</span></p>
+
+    <div class="flow" style="margin:38px 0 40px">
+      <div class="node n-mustard" style="width:330px">SCHEMA<small>JSON: struktura i typy pól</small></div>
+      <div class="arrow">+</div>
+      <div class="node n-coral" style="width:330px">DANE<small>binarne, same wartości</small></div>
+      <div class="arrow">=</div>
+      <div class="node n-ink" style="width:330px;padding:28px 22px">AVRO</div>
+    </div>
+
+    <div class="cols3">
+      <div class="card"><h3>Wymiana danych</h3><p>Wiadomości w&nbsp;Kafce i&nbsp;data streaming. Najpopularniejsze zastosowanie.</p></div>
+      <div class="card"><h3>Format plików</h3><p>Pliki <code>.avro</code> w&nbsp;Hadoop, Spark, data lake i&nbsp;hurtowniach w&nbsp;chmurze.</p></div>
+      <div class="card"><h3>RPC</h3><p>Wywoływanie metod na innym serwerze. Avro opisuje metody usługi, a&nbsp;argumenty i&nbsp;wyniki przesyła w&nbsp;formacie Avro.</p></div>
+    </div>
+  </section>
+
+  <!-- 4. Kluczowa idea -->
+  <section class="slide" data-section="avro">
+    <div class="eyebrow">Część I · Kluczowa idea</div>
+    <h2>Dane nie zawierają nazw pól</h2>
+    <p class="lead" style="margin-bottom:30px">Ten sam rekord <code>{age: 2}</code> zapisany w&nbsp;trzech formatach:</p>
+    <table class="t">
+      <tr><th>Format</th><th>Bajty</th><th>Rozmiar</th><th>Co jest zapisane</th></tr>
+      <tr><td>JSON</td><td><code>{"age":2}</code></td><td>9 B</td><td>nazwa pola przy <strong>każdej</strong> wartości, tekstowo</td></tr>
+      <tr><td>Protobuf</td><td><div class="bytes sm"><span class="b f-hdr">08</span><span class="b">02</span></div></td><td>2 B</td><td>tag (numer pola + typ) + wartość</td></tr>
+      <tr><td>Avro</td><td><div class="bytes sm"><span class="b f-age">04</span></div></td><td>1 B</td><td><strong>tylko wartość</strong>, pola w&nbsp;kolejności ze schematu</td></tr>
+    </table>
+    <div class="callout fragment" style="margin-top:36px">
+      Skoro w&nbsp;bajtach nie ma nazw ani typów, reader <strong>musi znać schemat, którym dane zostały zapisane</strong>: <em>writer's schema</em>.
+    </div>
+  </section>
+
+  <!-- 5. JSON vs Avro -->
+  <section class="slide" data-section="avro">
+    <div class="eyebrow">Część I · Jak to wygląda</div>
+    <h2>Ten sam pracownik: JSON vs Avro</h2>
+
+    <div class="cols c-40" style="gap:50px">
+      <div class="stack">
+        <div>
+          <div class="code-title">JSON · 40 bajtów (bez spacji)</div>
+          <pre class="code">{
+  <span class="p">"firstName"</span>: <span class="s">"Ala"</span>,
+  <span class="p">"age"</span>: <span class="n">2</span>,
+  <span class="p">"email"</span>: <span class="k">null</span>
+}</pre>
+        </div>
+        <div>
+          <div class="code-title">Avro · 6 bajtów</div>
+          <div class="bytes">
+            <span class="b f-name">06</span><span class="b f-name">41</span><span class="b f-name">6C</span><span class="b f-name">61</span>
+            <span class="b f-age">04</span><span class="b f-email">00</span>
+          </div>
+        </div>
+        <div class="legend"><span class="l-name">firstName</span><span class="l-age">age</span><span class="l-email">email</span></div>
+      </div>
+
+      <div>
+        <div class="code-title">Reader idzie po schemacie jak po skrypcie</div>
+        <div class="decode">
+          <div class="bytes sm fragment"><span class="b f-name">06</span><span class="b f-name">41</span><span class="b f-name">6C</span><span class="b f-name">61</span></div>
+          <p class="fragment"><strong>string</strong>: najpierw długość <code>06</code> = 3, potem 3&nbsp;bajty UTF-8 → <strong>"Ala"</strong></p>
+          <div class="bytes sm fragment"><span class="b f-age">04</span></div>
+          <p class="fragment"><strong>int</strong>: <code>04</code> → <strong>2</strong> (zigzag encoding)</p>
+          <div class="bytes sm fragment"><span class="b f-email">00</span></div>
+          <p class="fragment"><strong>union</strong>: indeks gałęzi 0 → <strong>null</strong>, sama wartość zajmuje 0&nbsp;B</p>
+        </div>
+        <div class="callout fragment" style="margin-top:26px">Ta sama wartość bajtu może znaczyć coś innego. O&nbsp;znaczeniu decyduje <strong>pozycja w&nbsp;schemacie</strong>. Długość stringa jest zapisana przed treścią, więc nie trzeba znaku końca.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6. Zigzag -->
+  <section class="slide" data-section="avro">
+    <div class="eyebrow">Część I · Kodowanie liczb</div>
+    <h2>Zigzag encoding</h2>
+    <p class="lead" style="margin-bottom:34px"><code>int</code> i&nbsp;<code>long</code> mają <strong>zmienną długość</strong>: małe liczby zajmują 1&nbsp;bajt. Żeby małe były też liczby <strong>ujemne</strong>, Avro przeplata liczby dodatnie i&nbsp;ujemne.</p>
+
+    <table class="t zz">
+      <tr><th>Wartość</th><td>0</td><td>1</td><td>−1</td><td class="hl-col">2</td><td>−2</td><td>3</td><td>−3</td><td class="muted">…</td></tr>
+      <tr><th>Zapisane jako</th><td>0</td><td>2</td><td>1</td><td class="hl-col">4</td><td>3</td><td>6</td><td>5</td><td class="muted">…</td></tr>
+    </table>
+    <p class="small muted" style="margin-top:12px">Wartość dodatnia <code>n</code> staje się <code>2n</code>, ujemna staje się nieparzysta. Nasze <code>age = 2</code> to bajt <code>04</code>.</p>
+
+    <div class="callout olive fragment" style="margin-top:28px">Większe liczby zajmują więcej bajtów. Rozmiar zależy od <strong>wartości</strong>, a&nbsp;nie od typu, dlatego Avro nie potrzebuje typów <code>short</code> ani <code>unsigned</code>.</div>
+  </section>
+
+  <!-- 7. Wierszowo -->
+  <section class="slide" data-section="avro">
+    <div class="eyebrow">Część I · Układ danych</div>
+    <h2>Avro jest row oriented</h2>
+    <div class="cols">
+      <div class="stack">
+        <h3>Wierszowo: Avro</h3>
+        <div class="rows">
+          <div class="bytes sm"><span class="b f-name">Ala</span><span class="b f-age">2</span><span class="b f-email">null</span></div>
+          <div class="bytes sm"><span class="b f-name">Jan</span><span class="b f-age">41</span><span class="b f-email">jan@x.pl</span></div>
+          <div class="bytes sm"><span class="b f-name">Ola</span><span class="b f-age">25</span><span class="b f-email">null</span></div>
+        </div>
+        <ul class="clean">
+          <li>zapis rekordu = jeden <strong>append</strong></li>
+          <li>konsument dostaje cały rekord naraz</li>
+          <li>idealne do <strong>data streaming</strong> i&nbsp;wymiany danych</li>
+        </ul>
+      </div>
+      <div class="stack">
+        <h3>Kolumnowo: Parquet</h3>
+        <div class="rows">
+          <div class="bytes sm"><span class="b f-name">Ala</span><span class="b f-name">Jan</span><span class="b f-name">Ola</span></div>
+          <div class="bytes sm"><span class="b f-age">2</span><span class="b f-age">41</span><span class="b f-age">25</span></div>
+          <div class="bytes sm"><span class="b f-email">null</span><span class="b f-email">jan@x.pl</span><span class="b f-email">null</span></div>
+        </div>
+        <ul class="clean">
+          <li><code>SUM(age)</code> czyta <strong>tylko</strong> kolumnę <code>age</code></li>
+          <li>lepsza kompresja podobnych wartości</li>
+          <li>idealne do <strong>analityki</strong></li>
+        </ul>
+      </div>
+    </div>
+    <div class="callout fragment" style="margin-top:22px">W&nbsp;układzie wierszowym, żeby dojść do <code>age</code>, trzeba zdekodować każde <code>firstName</code>. Ma zmienną długość, więc nie da się go przeskoczyć bez czytania.</div>
+  </section>
+
+  <!-- 8. Niezależność od języka -->
+  <section class="slide" data-section="avro">
+    <div class="eyebrow">Część I · Interoperacyjność</div>
+    <h2>Niezależność od języka</h2>
+    <p class="lead">Schema to zwykły JSON, a&nbsp;reguły kodowania są opisane w&nbsp;specyfikacji. Każda implementacja zapisuje i&nbsp;czyta <strong>te same bajty</strong>.</p>
+    <div class="flow" style="margin:34px 0">
+      <div class="node n-coral" style="width:260px">Java<small>producent</small></div>
+      <div class="arrow">→</div>
+      <div class="bytes" style="flex-wrap:nowrap">
+        <span class="b f-name">06</span><span class="b f-name">41</span><span class="b f-name">6C</span><span class="b f-name">61</span><span class="b f-age">04</span><span class="b f-email">00</span>
+      </div>
+      <div class="arrow">→</div>
+      <div class="node n-olive" style="width:260px">Python<small>konsument</small></div>
+    </div>
+    <div class="cols c-40">
+      <p>Projekt Apache Avro ma oficjalne biblioteki dla wielu języków: <strong>Java, C, C++, C#, Python, JavaScript, Rust, Ruby, PHP, Perl</strong>.</p>
+      <pre class="code sm"><span class="k">import</span> io, avro.schema
+<span class="k">from</span> avro.io <span class="k">import</span> DatumReader, BinaryDecoder
+
+schema = avro.schema.parse(<span class="k">open</span>(<span class="s">"employee.avsc"</span>).read())
+rec = DatumReader(schema).read(BinaryDecoder(io.BytesIO(data)))
+<span class="c"># {'firstName': 'Ala', 'age': 2, 'email': None}</span></pre>
+    </div>
+  </section>
+
+  <!-- ================================================================
+       CZĘŚĆ II: SCHEMA
+       ================================================================ -->
+
+  <!-- 9. Anatomia schematu -->
+  <section class="slide" data-section="schemat">
+    <div class="eyebrow">Część II · Schema</div>
+    <h2>Anatomia schematu</h2>
+    <div class="cols c-60">
+      <div>
+        <div class="code-title">src/main/resources/avro/employee.avsc</div>
+        <pre class="code">{
+  <span class="p">"type"</span>: <span class="s">"record"</span>,                            <span class="n">①</span>
+  <span class="p">"name"</span>: <span class="s">"Employee"</span>,                          <span class="n">②</span>
+  <span class="p">"namespace"</span>: <span class="s">"com.example.avro.generated"</span>,
+  <span class="p">"doc"</span>: <span class="s">"Pracownik firmy"</span>,
+  <span class="p">"fields"</span>: [                                  <span class="n">③</span>
+    {<span class="p">"name"</span>: <span class="s">"firstName"</span>, <span class="p">"type"</span>: <span class="s">"string"</span>},
+    {<span class="p">"name"</span>: <span class="s">"age"</span>,       <span class="p">"type"</span>: <span class="s">"int"</span>},
+    {<span class="p">"name"</span>: <span class="s">"email"</span>, <span class="p">"type"</span>: [<span class="s">"null"</span>, <span class="s">"string"</span>],
+     <span class="p">"default"</span>: <span class="k">null</span>}                           <span class="n">④</span>
+  ]
+}</pre>
+      </div>
+      <div>
+        <ol class="steps small" style="margin-top:14px">
+          <li><strong>record</strong>: typ złożony z&nbsp;nazwanymi polami.</li>
+          <li><strong>name + namespace</strong> = pełna nazwa <code>com.example.avro.generated.Employee</code>, używa jej generator klas.</li>
+          <li><strong>kolejność pól = kolejność bajtów</strong> w&nbsp;danych.</li>
+          <li><strong>union z null + default</strong>: pole opcjonalne.</li>
+        </ol>
+        <div class="callout navy small" style="margin-top:20px"><code>doc</code>, <code>default</code>, <code>aliases</code> nie zmieniają bajtów. Służą dokumentacji i&nbsp;<strong>schema evolution</strong>.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 10. Typy prymitywne -->
+  <section class="slide" data-section="schemat">
+    <div class="eyebrow">Część II · Typy</div>
+    <h2>8 typów prymitywnych</h2>
+    <table class="t">
+      <tr><th>Typ</th><th>Zapis binarny</th><th>Przykład</th><th>Bajty</th></tr>
+      <tr><td>null</td><td>0 bajtów</td><td><code>null</code></td><td class="muted">(nic)</td></tr>
+      <tr><td>boolean</td><td>1 bajt</td><td><code>true</code></td><td><div class="bytes xs"><span class="b">01</span></div></td></tr>
+      <tr><td>int</td><td>32 bity, zigzag, zmienna długość (1–5 B)</td><td><code>2</code></td><td><div class="bytes xs"><span class="b f-age">04</span></div></td></tr>
+      <tr><td>long</td><td>64 bity, zigzag, zmienna długość (1–10 B)</td><td><code>3</code></td><td><div class="bytes xs"><span class="b f-age">06</span></div></td></tr>
+      <tr><td>float</td><td>4 B, IEEE-754, little-endian</td><td><code>1.0</code></td><td><div class="bytes xs"><span class="b">00</span><span class="b">00</span><span class="b">80</span><span class="b">3F</span></div></td></tr>
+      <tr><td>double</td><td>8 B, IEEE-754, little-endian</td><td><code>1.0</code></td><td><div class="bytes xs"><span class="b">00</span><span class="b">00</span><span class="b">00</span><span class="b">00</span><span class="b">00</span><span class="b">00</span><span class="b">F0</span><span class="b">3F</span></div></td></tr>
+      <tr><td>bytes</td><td>długość (long) + surowe bajty</td><td><code>[12 34]</code></td><td><div class="bytes xs"><span class="b">04</span><span class="b">12</span><span class="b">34</span></div></td></tr>
+      <tr><td>string</td><td>długość (long) + UTF-8</td><td><code>"Ala"</code></td><td><div class="bytes xs"><span class="b f-name">06</span><span class="b f-name">41</span><span class="b f-name">6C</span><span class="b f-name">61</span></div></td></tr>
+    </table>
+  </section>
+
+  <!-- 11. Typy złożone -->
+  <section class="slide" data-section="schemat">
+    <div class="eyebrow">Część II · Typy</div>
+    <h2>Typy złożone</h2>
+    <div class="cols3" style="gap:22px">
+      <div class="card"><h3>record</h3><p>Pola po kolei, bez nagłówka i&nbsp;separatorów.</p><p class="small muted"><code>{"type":"record", "fields":[…]}</code></p></div>
+      <div class="card"><h3>enum</h3><p>Indeks symbolu jako <code>int</code>.</p><p class="small muted"><code>"symbols":["IT","HR","SALES"]</code><br>HR → <code>02</code></p></div>
+      <div class="card"><h3>array</h3><p>Liczba elementów, potem kolejne elementy.</p><p class="small muted"><code>{"type":"array", "items":"string"}</code></p></div>
+      <div class="card"><h3>map</h3><p>Jak array, ale pary klucz + wartość.</p><p class="small muted"><code>{"type":"map", "values":"int"}</code></p></div>
+      <div class="card"><h3>fixed</h3><p>Dokładnie N bajtów, bez długości.</p><p class="small muted"><code>{"type":"fixed", "name":"Md5", "size":16}</code></p></div>
+      <div class="card" style="background:var(--cream-2)"><h3>union</h3><p>Jedna z&nbsp;kilku gałęzi: indeks gałęzi + wartość.</p><p class="small muted"><code>["null","string"]</code> → następny slajd</p></div>
+    </div>
+  </section>
+
+  <!-- 12. Unie i null -->
+  <section class="slide" data-section="schemat">
+    <div class="eyebrow">Część II · Typy</div>
+    <h2>Union i null: pola opcjonalne</h2>
+    <pre class="code" style="margin-bottom:30px">{<span class="p">"name"</span>: <span class="s">"email"</span>, <span class="p">"type"</span>: [<span class="s">"null"</span>, <span class="s">"string"</span>], <span class="p">"default"</span>: <span class="k">null</span>}</pre>
+    <div class="cols">
+      <div class="stack">
+        <div class="code-title">email = null → 1 bajt</div>
+        <div class="bytes"><span class="b f-email">00</span></div>
+        <p class="small">indeks 0 → gałąź <code>"null"</code>, wartość: 0&nbsp;bajtów</p>
+        <div class="code-title" style="margin-top:28px">email = "a@b.pl" → 8 bajtów</div>
+        <div class="bytes sm"><span class="b f-email">02</span><span class="b gap f-name">0C</span><span class="b f-name">61</span><span class="b f-name">40</span><span class="b f-name">62</span><span class="b f-name">2E</span><span class="b f-name">70</span><span class="b f-name">6C</span></div>
+        <p class="small">indeks 1 → gałąź <code>"string"</code>, potem długość 6 i&nbsp;znaki</p>
+      </div>
+      <ul class="clean">
+        <li>W&nbsp;danych zapisany jest <strong>indeks gałęzi</strong>, więc reader wie, którego typu użyć.</li>
+        <li>Brak wartości kosztuje <strong>1&nbsp;bajt</strong>.</li>
+        <li><code>default</code> musi pasować do <strong>pierwszej</strong> gałęzi, więc przy <code>default: null</code> typ <code>"null"</code> idzie pierwszy.</li>
+        <li>Union nie może mieć dwóch gałęzi tego samego typu (wyjątek: różne typy nazwane, np. dwa rekordy).</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 13. Typy logiczne -->
+  <section class="slide" data-section="schemat">
+    <div class="eyebrow">Część II · Logical types</div>
+    <h2>Logical types</h2>
+    <p class="lead" style="margin-bottom:22px">Logical type = typ prymitywny + atrybut <code>logicalType</code>. <strong>Bajty się nie zmieniają</strong>, zmienia się tylko interpretacja w&nbsp;kodzie.</p>
+    <div class="cols c-60" style="gap:44px">
+      <table class="t tight" style="font-size:19px">
+        <tr><th>logicalType</th><th>Na typie</th><th>Znaczenie</th><th>Java</th></tr>
+        <tr><td>date</td><td>int</td><td>dni od 1970-01-01</td><td>LocalDate</td></tr>
+        <tr><td>time-millis / -micros</td><td>int / long</td><td>czas od północy</td><td>LocalTime</td></tr>
+        <tr><td>timestamp-millis / -micros</td><td>long</td><td>od 1970-01-01 UTC</td><td>Instant</td></tr>
+        <tr><td>local-timestamp-*</td><td>long</td><td>bez strefy czasowej</td><td>LocalDateTime</td></tr>
+        <tr><td>decimal</td><td>bytes / fixed</td><td>+ precision, scale</td><td>BigDecimal</td></tr>
+        <tr><td>uuid</td><td>string</td><td>identyfikator UUID</td><td>UUID</td></tr>
+        <tr><td>duration</td><td>fixed(12)</td><td>miesiące, dni, ms</td><td>(brak)</td></tr>
+      </table>
+      <div class="stack">
+        <pre class="code sm"><span class="c">// data, np. data zatrudnienia</span>
+{<span class="p">"type"</span>: <span class="s">"int"</span>, <span class="p">"logicalType"</span>: <span class="s">"date"</span>}
+<span class="c">// 2024-01-15 → 19737 dni → B2 B4 02</span>
+
+<span class="c">// znacznik czasu</span>
+{<span class="p">"type"</span>: <span class="s">"long"</span>,
+ <span class="p">"logicalType"</span>: <span class="s">"timestamp-millis"</span>}</pre>
+        <div class="callout olive small">Reader nie zna danego logical type? Ignoruje adnotację i&nbsp;używa typu bazowego, dlatego dodawanie logical types jest bezpieczne.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================================================================
+       CZĘŚĆ II: SCHEMA EVOLUTION
+       ================================================================ -->
+
+  <!-- 14. Wprowadzenie do schema evolution -->
+  <section class="slide" data-section="ewolucja">
+    <div class="eyebrow">Część II · Schema evolution</div>
+    <h2>Schema evolution: schemat też się zmienia</h2>
+    <div class="cols" style="gap:52px">
+      <div class="stack">
+        <h3>Historia jednego schematu</h3>
+        <div class="evo">
+          <div class="evo-step"><span class="tag fill">v1</span><p><code>firstName</code>, <code>age</code>, <code>email</code></p></div>
+          <div class="evo-step"><span class="tag" style="background:var(--mustard);border-color:var(--mustard)">v2</span><p>+ <code>department</code> z&nbsp;<code>default: "IT"</code></p></div>
+          <div class="evo-step"><span class="tag" style="background:var(--olive);border-color:var(--olive)">v3</span><p><code>age</code>: <code>int</code> → <code>long</code></p></div>
+          <div class="evo-step"><span class="tag" style="background:var(--pink);border-color:var(--pink)">v4</span><p><code>firstName</code> → <code>givenName</code></p></div>
+        </div>
+        <p class="small muted">Wymagania się zmieniają: dochodzą pola, inne znikają, typy rosną, nazwy się poprawia.</p>
+      </div>
+      <div class="stack">
+        <h3>Problem</h3>
+        <ul class="clean small">
+          <li>Producenci i&nbsp;konsumenci są wdrażani <strong>niezależnie</strong>. Nie da się zaktualizować wszystkich naraz.</li>
+          <li>Dane żyją długo: topic w&nbsp;Kafce (retencja), pliki w&nbsp;data lake. <strong>Stare i&nbsp;nowe dane leżą obok siebie.</strong></li>
+          <li>W&nbsp;bajtach nie ma nazw pól, więc kod nie zgadnie sam, co się zmieniło.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="callout olive small" style="margin-top:22px">
+      <strong>Rozwiązanie Avro</strong>
+      <div class="cols3" style="gap:30px;margin-top:8px">
+        <p style="font-size:20px"><strong>1.</strong> Bajty dekodujemy <em>writer's schema</em>, czyli schematem, którym je zapisano.</p>
+        <p style="font-size:20px"><strong>2.</strong> Wynik dopasowujemy do <em>reader's schema</em>, czyli schematu, którego używa nasz kod.</p>
+        <p style="font-size:20px"><strong>3.</strong> Schema Registry odrzuca nową wersję schematu, która nie jest <strong>compatible</strong>.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 15. Writer vs reader -->
+  <section class="slide" data-section="ewolucja">
+    <div class="eyebrow">Część II · Schema evolution</div>
+    <h2>Writer's schema vs reader's schema</h2>
+    <div class="flow" style="margin:6px 0 34px">
+      <div class="node n-mustard" style="width:250px">Bajty<small>zapisane wersją v1</small></div>
+      <div class="arrow">→</div>
+      <div class="node n-coral" style="width:360px">Dekodowanie<small>zawsze wg <strong>writer's schema</strong></small></div>
+      <div class="arrow">→</div>
+      <div class="node n-navy" style="width:360px">Dopasowanie pól<small><strong>po nazwie</strong> do reader's schema</small></div>
+      <div class="arrow">→</div>
+      <div class="node n-olive" style="width:200px">Obiekt v2</div>
+    </div>
+    <div class="cols c-60">
+      <table class="t">
+        <tr><th>Pole jest…</th><th>Reader…</th></tr>
+        <tr><td>w&nbsp;obu schematach</td><td>bierze odczytaną wartość (typy muszą być zgodne)</td></tr>
+        <tr><td>tylko w&nbsp;reader's schema</td><td>wstawia <code>default</code>, a&nbsp;bez niego <span class="no">błąd</span></td></tr>
+        <tr><td>tylko w&nbsp;writer's schema</td><td>dekoduje i&nbsp;<strong>odrzuca</strong></td></tr>
+      </table>
+      <div class="stack">
+        <div class="code-title">Przykład: v2 dodaje pole</div>
+        <pre class="code sm">{<span class="p">"name"</span>: <span class="s">"department"</span>,
+ <span class="p">"type"</span>: <span class="s">"string"</span>, <span class="p">"default"</span>: <span class="s">"IT"</span>}</pre>
+        <p class="small">Stare bajty <code>06 41 6C 61 04 00</code> → reader v2 dostaje <code>department = "IT"</code>.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 16. Promocja typów -->
+  <section class="slide" data-section="ewolucja">
+    <div class="eyebrow">Część II · Schema evolution</div>
+    <h2>Type promotion</h2>
+    <div class="cols" style="gap:48px">
+      <div class="stack">
+        <table class="t tight">
+          <tr><th>Writer</th><th>Reader może mieć</th></tr>
+          <tr><td>int</td><td>long, float, double</td></tr>
+          <tr><td>long</td><td>float, double</td></tr>
+          <tr><td>float</td><td>double</td></tr>
+          <tr><td>string</td><td>bytes</td></tr>
+          <tr><td>bytes</td><td>string</td></tr>
+        </table>
+        <p class="small muted">Niedozwolone, np. <code>int → string</code>, <code>double → float</code>, <code>long → int</code>. Obejście: nowe pole + <code>default</code>.</p>
+      </div>
+      <div class="stack">
+        <div class="code-title">Przykład: age int → long</div>
+        <div class="flow" style="gap:12px">
+          <div class="bytes sm"><span class="b f-age">04</span></div>
+          <div class="small">zapisane jako <code>int</code> → czytane jako <code>long</code> → <strong>2</strong></div>
+        </div>
+        <p class="small">Bajty są <strong>identyczne</strong>: oba typy używają tego samego kodowania o&nbsp;zmiennej długości. Rośnie tylko zakres.</p>
+        <table class="t tight small">
+          <tr><td>nowy (long) czyta stare (int)</td><td class="yes">✓ BACKWARD</td></tr>
+          <tr><td>stary (int) czyta nowe (long)</td><td class="no">✗ FORWARD</td></tr>
+        </table>
+        <div class="callout small">Uwaga na precyzję: <code>long → double</code> jest dozwolone, ale double ma ~16 cyfr znaczących, a&nbsp;long ~19.<br><code>9 007 199 254 740 993</code> → <code>9 007 199 254 740 992</code></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 17. Zmiana nazwy -->
+  <section class="slide" data-section="ewolucja">
+    <div class="eyebrow">Część II · Schema evolution</div>
+    <h2>Zmiana nazwy pola</h2>
+    <p class="lead" style="margin-bottom:30px">W&nbsp;bajtach nie ma nazw, a&nbsp;dopasowanie odbywa się <strong>po nazwie</strong>. Zwykła zmiana nazwy = usunięcie starego pola + dodanie nowego.</p>
+    <div class="cols">
+      <div class="card pad-top">
+        <div class="bar" style="background:var(--red)"></div>
+        <h3>Bez aliasu <span class="no">✗</span></h3>
+        <pre class="code sm">{<span class="p">"name"</span>: <span class="s">"givenName"</span>, <span class="p">"type"</span>: <span class="s">"string"</span>}</pre>
+        <p class="small" style="margin-top:14px">Stare <code>firstName</code> zostaje odrzucone, a&nbsp;<code>givenName</code> nie ma wartości domyślnej, więc błąd (albo cicha utrata danych, jeśli default jest).</p>
+      </div>
+      <div class="card pad-top">
+        <div class="bar" style="background:var(--olive)"></div>
+        <h3>Z aliasem <span class="yes">✓</span></h3>
+        <pre class="code sm">{<span class="p">"name"</span>: <span class="s">"givenName"</span>, <span class="p">"type"</span>: <span class="s">"string"</span>,
+ <span class="p">"aliases"</span>: [<span class="s">"firstName"</span>]}</pre>
+        <p class="small" style="margin-top:14px">Reader dopasuje stare <code>firstName</code> do nowego <code>givenName</code>.</p>
+      </div>
+    </div>
+    <div class="callout navy" style="margin-top:28px">Alias jest w&nbsp;<strong>reader's schema</strong>, więc pomaga tylko w&nbsp;kierunku BACKWARD. Stary konsument nie wie, że <code>givenName</code> to jego <code>firstName</code>.</div>
+  </section>
+
+  <!-- ================================================================
+       CZĘŚĆ III: AVRO W PRAKTYCE
+       ================================================================ -->
+
+  <!-- 18. Gdzie jest schemat w Kafce -->
+  <section class="slide" data-section="kafka">
+    <div class="eyebrow">Część III · Avro + Kafka</div>
+    <h2>Gdzie jest schema w&nbsp;Kafce?</h2>
+    <p class="lead" style="margin-bottom:30px">Topic to miliony małych wiadomości o&nbsp;tym samym kształcie. Doklejenie schematu do każdej z&nbsp;nich zniweczyłoby całą kompaktowość. Zamiast tego wiadomość niesie <strong>ID schematu</strong>.</p>
+    <div class="code-title">Format wiadomości Confluent (Schema Registry) · 11 bajtów</div>
+    <div class="bytes" style="margin-bottom:12px">
+      <span class="b f-hdr">00</span>
+      <span class="b f-id gap">00</span><span class="b f-id">00</span><span class="b f-id">00</span><span class="b f-id">01</span>
+      <span class="b f-name gap">06</span><span class="b f-name">41</span><span class="b f-name">6C</span><span class="b f-name">61</span><span class="b f-age">04</span><span class="b f-email">00</span>
+    </div>
+    <div class="legend" style="margin-bottom:34px"><span class="l-hdr">magic byte</span><span class="l-id">ID schematu (4 B)</span><span class="l-name">dane Avro (te same 6 B)</span></div>
+    <div class="callout navy">Alternatywa ze specyfikacji Avro, <strong>single-object encoding</strong>: <code>C3 01</code> + 8-bajtowy <strong>fingerprint</strong> schematu + dane. Fingerprint liczony jest z&nbsp;kanonicznej postaci schematu, więc nie potrzeba centralnego licznika ID.</div>
+  </section>
+
+  <!-- 19. Schema Registry -->
+  <section class="slide" data-section="kafka">
+    <div class="eyebrow">Część III · Avro + Kafka</div>
+    <h2>Schema Registry</h2>
+    <div class="flow" style="margin:4px 0 34px;gap:14px">
+      <div class="node n-coral" style="width:220px">Producent</div>
+      <div class="arrow" style="font-size:18px;text-align:center">① rejestruje schemat<br>→ dostaje ID</div>
+      <div class="node n-mustard" style="width:260px">Schema Registry<small>subject → wersje → ID</small></div>
+      <div class="arrow" style="font-size:18px;text-align:center">④ pobiera schemat<br>po ID (cache) ←</div>
+      <div class="node n-olive" style="width:220px">Konsument</div>
+    </div>
+    <div class="flow" style="margin:-14px 0 30px 0;justify-content:center;gap:14px">
+      <div class="small"><strong>②</strong> producent wysyła <code>[ID + bajty]</code></div>
+      <div class="node n-ink" style="width:240px">Kafka<small>topic employees-avro</small></div>
+      <div class="small"><strong>③</strong> konsument czyta wiadomość</div>
+    </div>
+    <div class="cols">
+      <ul class="clean small">
+        <li><strong>Subject</strong>: <code>employees-avro-value</code> (nazwa topicu + <code>-value</code>)</li>
+        <li><strong>Wersje</strong>: v1, v2, … każda z&nbsp;globalnym ID</li>
+        <li><strong>Compatibility check</strong> przy rejestracji: domyślnie BACKWARD. Niezgodny schemat → <code>HTTP 409</code></li>
+      </ul>
+      <pre class="code sm"><span class="c"># lista subjectów i wersji</span>
+curl localhost:8081/subjects
+curl localhost:8081/subjects/employees-avro-value/versions
+
+<span class="c"># tryb compatibility</span>
+curl localhost:8081/config</pre>
+    </div>
+  </section>
+
+  <!-- 20. Generowanie klas -->
+  <section class="slide" data-section="kafka">
+    <div class="eyebrow">Część III · Generowanie kodu</div>
+    <h2>Od schematu do klasy</h2>
+    <div class="cols" style="gap:40px">
+      <div class="stack">
+        <div class="code-title">pom.xml</div>
+        <pre class="code sm">&lt;<span class="k">plugin</span>&gt;
+  &lt;<span class="k">groupId</span>&gt;org.apache.avro&lt;/<span class="k">groupId</span>&gt;
+  &lt;<span class="k">artifactId</span>&gt;avro-maven-plugin&lt;/<span class="k">artifactId</span>&gt;
+  &lt;<span class="k">version</span>&gt;<span class="n">1.12.2</span>&lt;/<span class="k">version</span>&gt;
+  &lt;<span class="k">executions</span>&gt;&lt;<span class="k">execution</span>&gt;
+    &lt;<span class="k">phase</span>&gt;<span class="s">generate-sources</span>&lt;/<span class="k">phase</span>&gt;
+    &lt;<span class="k">goals</span>&gt;&lt;<span class="k">goal</span>&gt;<span class="s">schema</span>&lt;/<span class="k">goal</span>&gt;&lt;/<span class="k">goals</span>&gt;
+  &lt;/<span class="k">execution</span>&gt;&lt;/<span class="k">executions</span>&gt;
+&lt;/<span class="k">plugin</span>&gt;</pre>
+        <div class="flow" style="gap:10px">
+          <div class="node n-mustard" style="padding:12px 16px">employee.avsc</div>
+          <div class="arrow" style="font-size:20px">mvn generate-sources →</div>
+          <div class="node n-coral" style="padding:12px 16px">Employee.java</div>
+        </div>
+      </div>
+      <div class="stack">
+        <pre class="code sm">Employee e = Employee.newBuilder()
+    .setFirstName(<span class="s">"Ala"</span>)
+    .setAge(<span class="n">2</span>)
+    .build();   <span class="c">// email = null (default)</span></pre>
+        <table class="t tight small">
+          <tr><th>API</th><th>Kiedy</th></tr>
+          <tr><td>Specific</td><td>wygenerowane klasy, kontrola typów przy kompilacji. Aplikacje.</td></tr>
+          <tr><td>Generic</td><td><code>GenericRecord</code>, pola po nazwie, schemat w&nbsp;runtime. Narzędzia, pipeline'y.</td></tr>
+          <tr><td>Reflect</td><td>schemat wyprowadzany z&nbsp;istniejących klas Javy.</td></tr>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- 21. Producent i konsument -->
+  <section class="slide" data-section="kafka">
+    <div class="eyebrow">Część III · Spring Boot + Kafka</div>
+    <h2>Producent i konsument</h2>
+    <div class="cols" style="gap:36px;grid-template-columns:1.45fr 1fr">
+      <div>
+        <div class="code-title">application.yaml</div>
+        <pre class="code sm" style="font-size:15px"><span class="p">spring</span>:
+  <span class="p">kafka</span>:
+    <span class="p">bootstrap-servers</span>: localhost:9092
+    <span class="p">producer</span>:
+      <span class="p">value-serializer</span>: <span class="s">io.confluent.kafka.serializers.KafkaAvroSerializer</span>
+    <span class="p">consumer</span>:
+      <span class="p">group-id</span>: demo
+      <span class="p">value-deserializer</span>: <span class="s">io.confluent.kafka.serializers.KafkaAvroDeserializer</span>
+    <span class="p">properties</span>:
+      <span class="p">schema.registry.url</span>: http://localhost:8081
+      <span class="p">specific.avro.reader</span>: <span class="k">true</span></pre>
+      </div>
+      <div class="stack">
+        <div class="code-title">Java</div>
+        <pre class="code sm"><span class="c">// producent</span>
+kafka.send(<span class="s">"employees-avro"</span>,
+           e.getFirstName().toString(), e);
+
+<span class="c">// konsument</span>
+<span class="k">@KafkaListener</span>(topics = <span class="s">"employees-avro"</span>)
+<span class="k">void</span> onEmployee(Employee e) {
+  log.info(<span class="s">"Odebrano: {}, age {}"</span>,
+           e.getFirstName(), e.getAge());
+}</pre>
+        <div class="callout small"><code>specific.avro.reader: true</code>: deserializer zwraca wygenerowaną klasę <code>Employee</code> zamiast <code>GenericRecord</code>.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 22. Parquet -->
+  <section class="slide" data-section="parquet">
+    <div class="eyebrow">Część III · Interoperacyjność</div>
+    <h2>Avro ↔ Parquet</h2>
+    <div class="flow" style="margin:4px 0 34px;gap:12px">
+      <div class="node n-coral" style="width:200px">Producent</div>
+      <div class="arrow">→</div>
+      <div class="node n-mustard" style="width:250px">Kafka<small>Avro · wiersze</small></div>
+      <div class="arrow">→</div>
+      <div class="node" style="width:270px">Kafka Connect / Spark<small>konwersja</small></div>
+      <div class="arrow">→</div>
+      <div class="node n-olive" style="width:250px">Data lake<small>Parquet · kolumny</small></div>
+      <div class="arrow">→</div>
+      <div class="node n-navy" style="width:190px">Analityka<small>Spark SQL, Trino</small></div>
+    </div>
+    <div class="cols" style="gap:40px">
+      <pre class="code sm"><span class="k">try</span> (ParquetWriter&lt;Employee&gt; w = AvroParquetWriter
+        .&lt;Employee&gt;builder(<span class="k">new</span> Path(<span class="s">"employees.parquet"</span>))
+        .withSchema(Employee.getClassSchema())
+        .withCompressionCodec(CompressionCodecName.SNAPPY)
+        .build()) {
+    <span class="k">for</span> (Employee e : employees) w.write(e);
+}</pre>
+      <ul class="clean small">
+        <li><strong>Avro do data streaming, Parquet do analityki</strong>, razem w&nbsp;jednym pipeline.</li>
+        <li><code>parquet-avro</code> zapisuje Parquet <strong>z&nbsp;tego samego schematu Avro</strong> i&nbsp;tych samych obiektów <code>Employee</code>.</li>
+        <li>Schemat Avro trafia do metadanych pliku (<code>parquet.avro.schema</code>), więc <code>AvroParquetReader</code> odtworzy z&nbsp;niego obiekty.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 23. Podsumowanie -->
+  <section class="slide" data-section="koniec">
+    <div class="eyebrow">Podsumowanie</div>
+    <h2>Co warto zapamiętać</h2>
+    <div class="stack" style="max-width:1100px">
+      <div class="flow" style="gap:26px"><div class="big-num" style="width:70px">1</div><p>Dane bez nazw pól, więc reader potrzebuje <strong>writer's schema</strong>.</p></div>
+      <div class="flow" style="gap:26px"><div class="big-num" style="width:70px">2</div><p>Kompaktowe liczby (zigzag encoding, zmienna długość): rozmiar zależy od wartości.</p></div>
+      <div class="flow" style="gap:26px"><div class="big-num" style="width:70px">3</div><p>Schema evolution: dekodowanie wg writer's schema, dopasowanie <strong>po nazwie</strong>; <code>default</code>, aliases, type promotion.</p></div>
+      <div class="flow" style="gap:26px"><div class="big-num" style="width:70px">4</div><p>Kafka + Schema Registry: ID schematu w&nbsp;wiadomości, compatibility check przy rejestracji.</p></div>
+      <div class="flow" style="gap:26px"><div class="big-num" style="width:70px">5</div><p>Avro do data streaming i&nbsp;wymiany danych, Parquet do analityki. Razem w&nbsp;jednym pipeline.</p></div>
+    </div>
+    <svg class="deco" viewBox="0 0 420 520" style="right:40px;bottom:60px;width:400px;height:500px" aria-hidden="true">
+      <use href="#sprig" x="250" y="0" width="170" height="360" style="color:var(--olive)"/>
+      <use href="#leaf" x="190" y="150" width="150" height="300" transform="rotate(28 265 300)" style="fill:var(--pink)"/>
+      <use href="#oak" x="160" y="290" width="240" height="240" style="fill:var(--red)"/>
+      <use href="#leaf" x="120" y="300" width="90" height="180" transform="rotate(-35 165 390)" style="fill:var(--navy)"/>
+      <use href="#oak" x="60" y="380" width="170" height="170" style="fill:var(--wine)"/>
+    </svg>
+  </section>
+
+  <!-- 24. Źródła -->
+  <section class="slide" data-section="koniec" style="justify-content:center">
+    <div class="eyebrow">Dziękuję</div>
+    <h1 style="font-size:150px">Pytania?</h1>
+    <div class="stack small" style="margin-top:40px;max-width:900px">
+      <p><strong>Źródła</strong></p>
+      <ul class="clean">
+        <li>Apache Avro 1.12 Specification, avro.apache.org</li>
+        <li>I. Mejía, R. Skraba, „Dive into Avro”, ApacheCon NA 2022</li>
+        <li>Confluent Docs: Schema Registry, Schema Evolution and Compatibility</li>
+        <li>Kod demo: <code>avro/avro</code> (Spring Boot + Kafka)</li>
+      </ul>
+    </div>
+    <svg class="deco" viewBox="0 0 640 720" style="right:40px;top:110px;width:640px;height:720px" aria-hidden="true">
+      <use href="#sprig" x="430" y="0" width="200" height="420" style="color:var(--olive)"/>
+      <use href="#leaf" x="90" y="200" width="170" height="340" transform="rotate(-38 175 370)" style="fill:var(--pink)"/>
+      <circle cx="330" cy="400" r="200" fill="var(--mustard)"/>
+      <text x="330" y="440" text-anchor="middle" style="font-family:var(--display);font-size:130px" fill="var(--ink)">?</text>
+      <use href="#oak" x="380" y="430" width="250" height="250" style="fill:var(--red)"/>
+      <use href="#oak" x="80" y="480" width="200" height="200" style="fill:var(--red)"/>
+      <use href="#leaf" x="240" y="520" width="120" height="220" transform="rotate(-12 300 630)" style="fill:var(--olive)"/>
+      <use href="#leaf" x="520" y="330" width="80" height="160" transform="rotate(48 560 410)" style="fill:var(--navy)"/>
+    </svg>
+  </section>
+
+</div>
+
+<script src="slides.js"></script>
+</body>
+</html>
